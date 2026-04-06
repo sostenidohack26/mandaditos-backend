@@ -29,8 +29,9 @@ export class User {
     type: 'varchar',
     length: 25,
     unique: true,
+    nullable: true,
   })
-  phone: string;
+  phone: string | null;
 
   @Column({
     type: 'varchar',
@@ -43,6 +44,7 @@ export class User {
   @Column({
     name: 'password_hash',
     type: 'text',
+    default: '',
   })
   passwordHash: string;
 

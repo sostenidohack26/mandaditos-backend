@@ -1,8 +1,11 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { JwtService } from '@nestjs/jwt';
-import * as bcrypt from 'bcrypt';
 import { Repository } from 'typeorm';
+import * as bcrypt from 'bcryptjs';
 
 import { User } from '../users/entities/user.entity';
 import { LoginDto } from './dto/login.dto';
@@ -17,77 +20,76 @@ export class AuthService {
     private readonly jwtService: JwtService,
   ) {}
 
-  async seedAdminAndDriverIfNeeded() {
-    const adminExists = await this.usersRepository.findOne({
-      where: { email: 'admin@mandaditos.local' },
-    });
-
-    if (!adminExists) {
-      const adminPassword = await bcrypt.hash('123456', 10);
-
-      await this.usersRepository.save(
-        this.usersRepository.create({
-          role: UserRole.ADMIN,
-          fullName: 'Super Admin',
-          phone: '0000000001',
-          email: 'admin@mandaditos.local',
-          passwordHash: adminPassword,
-          isActive: true,
-        }),
-      );
-    }
-
-    const driverExists = await this.usersRepository.findOne({
-      where: { email: 'pedro@mandaditos.local' },
-    });
-
-    if (!driverExists) {
-      const driverPassword = await bcrypt.hash('123456', 10);
-
-      await this.usersRepository.save(
-        this.usersRepository.create({
-          role: UserRole.DRIVER,
-          fullName: 'Pedro Repartidor',
-          phone: '0000000002',
-          email: 'pedro@mandaditos.local',
-          passwordHash: driverPassword,
-          isActive: true,
-        }),
-      );
-    }
-  }
-
   async login(dto: LoginDto) {
-    const value = dto.usernameOrPhone.trim().toLowerCase();
+    const usernameOrPhone = dto.usernameOrPhone.trim();
 
-    const user = await this.usersRepository
-      .createQueryBuilder('user')
-      .where('LOWER(user.email) = :value', { value })
-      .orWhere('user.phone = :phone', { phone: dto.usernameOrPhone.trim() })
-      .getOne();
+    const user = await this.usersRepository.findOne({
+      where: [
+        { email: usernameOrPhone },
+        { phone: usernameOrPhone },
+      ],
+    });
 
     if (!user || !user.isActive) {
-      throw new UnauthorizedException('Credenciales inválidas');
+      throw new UnauthorizedException('Usuario no válido');
     }
 
-    if (user.role !== UserRole.ADMIN && user.role !== UserRole.DRIVER) {
-      throw new UnauthorizedException('Acceso no permitido');
+    const validPassword = await bcrypt.compare(
+      dto.password,
+      user.passwordHash,
+    );
+
+    if (!validPassword) {
+      throw new UnauthorizedException('Contraseña incorrecta');
     }
 
-    const valid = await bcrypt.compare(dto.password, user.passwordHash);
+    return this.buildLoginResponse(user);
+  }
 
-    if (!valid) {
-      throw new UnauthorizedException('Credenciales inválidas');
+  async googleCustomerLogin(dto: GoogleCustomerLoginDto) {
+    const normalizedEmail = dto.email.trim().toLowerCase();
+    const normalizedPhone =
+        dto.phone != null && dto.phone.trim().length > 0
+            ? dto.phone.trim()
+            : null;
+
+    let user = await this.usersRepository.findOne({
+      where: { email: normalizedEmail },
+    });
+
+    if (!user && normalizedPhone != null) {
+      user = await this.usersRepository.findOne({
+        where: { phone: normalizedPhone },
+      });
     }
 
-    const payload = {
-      sub: user.id,
+    if (!user) {
+      user = this.usersRepository.create({
+        role: UserRole.CUSTOMER,
+        fullName: dto.fullName.trim(),
+        email: normalizedEmail,
+        phone: normalizedPhone,
+        passwordHash: '',
+        isActive: true,
+      });
+    } else {
+      user.fullName = dto.fullName.trim();
+      user.email = normalizedEmail;
+      user.phone = normalizedPhone;
+      user.isActive = true;
+    }
+
+    const saved = await this.usersRepository.save(user);
+    return this.buildLoginResponse(saved);
+  }
+
+  private buildLoginResponse(user: User) {
+    const accessToken = this.jwtService.sign({
+      userId: user.id,
       role: user.role,
-      phone: user.phone,
       email: user.email,
-    };
-
-    const accessToken = await this.jwtService.signAsync(payload);
+      phone: user.phone,
+    });
 
     return {
       user: {
@@ -96,63 +98,6 @@ export class AuthService {
         phone: user.phone,
         email: user.email,
         role: user.role,
-      },
-      accessToken,
-    };
-  }
-
-  async loginGoogleCustomer(dto: GoogleCustomerLoginDto) {
-    const normalizedEmail = dto.email?.trim().toLowerCase();
-
-    let user: User | null = null;
-
-    if (normalizedEmail != null && normalizedEmail.length > 0) {
-      user = await this.usersRepository.findOne({
-        where: { email: normalizedEmail },
-      });
-    }
-
-    if (!user && dto.phone != null && dto.phone.trim().length > 0) {
-      user = await this.usersRepository.findOne({
-        where: { phone: dto.phone.trim() },
-      });
-    }
-
-    if (!user) {
-      user = this.usersRepository.create({
-        role: UserRole.CUSTOMER,
-        fullName: dto.fullName.trim(),
-        phone: dto.phone != null && dto.phone.trim().length > 0
-            ? dto.phone.trim()
-            : `cust_${Date.now()}`,
-        email: normalizedEmail ?? null,
-        passwordHash: 'google_auth',
-        isActive: true,
-      });
-    } else {
-      user.fullName = dto.fullName.trim();
-      user.email = normalizedEmail ?? user.email;
-      user.isActive = true;
-    }
-
-    const savedUser = await this.usersRepository.save(user);
-
-    const payload = {
-      sub: savedUser.id,
-      role: savedUser.role,
-      phone: savedUser.phone,
-      email: savedUser.email,
-    };
-
-    const accessToken = await this.jwtService.signAsync(payload);
-
-    return {
-      user: {
-        id: savedUser.id,
-        fullName: savedUser.fullName,
-        phone: savedUser.phone,
-        email: savedUser.email,
-        role: savedUser.role,
       },
       accessToken,
     };
