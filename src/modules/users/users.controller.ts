@@ -17,6 +17,11 @@ import { UpdateMeDto } from './dto/update-me.dto';
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
+  @Get('test-me')
+  testMe() {
+    return { ok: true, route: 'users/test-me' };
+  }
+
   @Get('drivers')
   findDrivers(@Req() req: any) {
     if (req.user.role !== UserRole.ADMIN) {
