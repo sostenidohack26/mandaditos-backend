@@ -8,19 +8,14 @@ import {
   Req,
   UseGuards,
   ForbiddenException,
-  UploadedFile,
-  UseInterceptors,
 } from '@nestjs/common';
-import { FileInterceptor } from '@nestjs/platform-express';
-import { diskStorage } from 'multer';
-import { extname } from 'path';
 
 import { OrdersService } from './orders.service';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { AssignOrderDto } from './dto/assign-order.dto';
 import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
 import { CompleteDeliveryDto } from './dto/complete-delivery.dto';
-import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { UserRole } from '../../common/enums/user-role.enum';
 
 @Controller('orders')
@@ -32,6 +27,13 @@ export class OrdersController {
   create(@Body() dto: CreateOrderDto, @Req() req: any) {
     if (
       req.user.role !== UserRole.ADMIN &&
+      req.user.role !== UserRole.CUSTOMER
+    ) {
+      throw new ForbiddenException('No autorizado');
+    }
+
+    if (
+      req.user.role === UserRole.CUSTOMER &&
       req.user.userId !== dto.customerId
     ) {
       throw new ForbiddenException('No autorizado');
@@ -41,32 +43,29 @@ export class OrdersController {
   }
 
   @Get('customer/:customerId')
-  findByCustomer(@Param('customerId') customerId: string, @Req() req: any) {
-    if (
-      req.user.role !== UserRole.ADMIN &&
-      req.user.userId !== customerId
-    ) {
-      throw new ForbiddenException('No autorizado');
-    }
+findByCustomer(
+  @Param('customerId') customerId: string,
+  @Req() req: any,
+ ) {
+  console.log('ORDERS req.user =>', req.user);
+  console.log('ORDERS customerId =>', customerId);
 
-    return this.ordersService.findByCustomer(customerId);
+  if (
+    req.user.role !== UserRole.ADMIN &&
+    req.user.userId !== customerId
+  ) {
+    throw new ForbiddenException('No autorizado');
   }
 
-  @Get('available')
-  findAvailable(@Req() req: any) {
-    if (
-      req.user.role !== UserRole.DRIVER &&
-      req.user.role !== UserRole.ADMIN
-    ) {
-      throw new ForbiddenException('No autorizado');
-    }
-
-    return this.ordersService.findAvailable();
-  }
+  return this.ordersService.findByCustomer(customerId);
+ }
 
   @Get('live')
   findLive(@Req() req: any) {
-    if (req.user.role !== UserRole.ADMIN) {
+    if (
+      req.user.role !== UserRole.ADMIN &&
+      req.user.role !== UserRole.DRIVER
+    ) {
       throw new ForbiddenException('No autorizado');
     }
 
@@ -81,7 +80,7 @@ export class OrdersController {
   ) {
     if (
       req.user.role !== UserRole.ADMIN &&
-      req.user.userId !== dto.driverId
+      req.user.role !== UserRole.DRIVER
     ) {
       throw new ForbiddenException('No autorizado');
     }
@@ -96,8 +95,8 @@ export class OrdersController {
     @Req() req: any,
   ) {
     if (
-      req.user.role !== UserRole.DRIVER &&
-      req.user.role !== UserRole.ADMIN
+      req.user.role !== UserRole.ADMIN &&
+      req.user.role !== UserRole.DRIVER
     ) {
       throw new ForbiddenException('No autorizado');
     }
@@ -106,36 +105,22 @@ export class OrdersController {
   }
 
   @Post(':orderId/complete-delivery')
-  @UseInterceptors(
-    FileInterceptor('photo', {
-      storage: diskStorage({
-        destination: './uploads/deliveries',
-        filename: (_req, file, cb) => {
-          const unique = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
-          cb(null, `delivery-${unique}${extname(file.originalname)}`);
-        },
-      }),
-    }),
-  )
   completeDelivery(
     @Param('orderId') orderId: string,
-    @UploadedFile() file: Express.Multer.File,
     @Body() dto: CompleteDeliveryDto,
     @Req() req: any,
   ) {
     if (
-      req.user.role !== UserRole.DRIVER &&
-      req.user.role !== UserRole.ADMIN
+      req.user.role !== UserRole.ADMIN &&
+      req.user.role !== UserRole.DRIVER
     ) {
       throw new ForbiddenException('No autorizado');
     }
 
-    const photoUrl = file ? `/uploads/deliveries/${file.filename}` : null;
-
     return this.ordersService.completeDelivery(
       orderId,
-      dto.deliveryNote,
-      photoUrl ?? undefined,
+      dto.deliveryNote ?? '',
+      '',
     );
   }
 }

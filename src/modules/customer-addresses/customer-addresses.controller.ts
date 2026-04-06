@@ -20,21 +20,23 @@ export class CustomerAddressesController {
     private readonly customerAddressesService: CustomerAddressesService,
   ) {}
 
-  @Post(':customerId')
-  create(
-    @Param('customerId') customerId: string,
-    @Body() dto: CreateCustomerAddressDto,
-    @Req() req: any,
-  ) {
-    if (
-      req.user.role !== UserRole.ADMIN &&
-      req.user.userId !== customerId
-    ) {
-      throw new ForbiddenException('No autorizado');
-    }
+  @Get(':customerId')
+findByCustomer(
+  @Param('customerId') customerId: string,
+  @Req() req: any,
+ ) {
+  console.log('ADDR req.user =>', req.user);
+  console.log('ADDR customerId =>', customerId);
 
-    return this.customerAddressesService.create(customerId, dto);
+  if (
+    req.user.role !== UserRole.ADMIN &&
+    req.user.userId !== customerId
+  ) {
+    throw new ForbiddenException('No autorizado');
   }
+
+  return this.customerAddressesService.findByCustomer(customerId);
+ }
 
   @Get(':customerId')
   findByCustomer(
