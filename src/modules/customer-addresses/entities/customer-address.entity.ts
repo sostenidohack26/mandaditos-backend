@@ -58,6 +58,20 @@ export class CustomerAddress {
   })
   isPrimary: boolean;
 
+  @Column({
+    name: 'latitude',
+    type: 'double precision',
+    nullable: true,
+  })
+  latitude: number | null;
+
+  @Column({
+    name: 'longitude',
+    type: 'double precision',
+    nullable: true,
+  })
+  longitude: number | null;
+
   @CreateDateColumn({
     name: 'created_at',
     type: 'timestamp',
