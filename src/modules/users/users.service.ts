@@ -47,11 +47,11 @@ export class UsersService {
       throw new NotFoundException('Usuario no encontrado');
     }
 
-    if (dto.fullName != null && dto.fullName.trim().length > 0) {
+    if (dto.fullName != null && dto.fullName.trim().isNotEmpty) {
       user.fullName = dto.fullName.trim();
     }
 
-    if (dto.phone != null && dto.phone.trim().length > 0) {
+    if (dto.phone != null && dto.phone.trim().isNotEmpty) {
       user.phone = dto.phone.trim();
     }
 
@@ -59,8 +59,10 @@ export class UsersService {
   }
 
   async createDriver(dto: AdminUpsertDriverDto) {
+    const email = dto.email.trim().toLowerCase();
+
     const existing = await this.usersRepository.findOne({
-      where: { email: dto.email.trim().toLowerCase() },
+      where: { email },
     });
 
     if (existing) {
@@ -78,7 +80,7 @@ export class UsersService {
     const driver = this.usersRepository.create({
       fullName: dto.fullName.trim(),
       phone: dto.phone?.trim() ?? null,
-      email: dto.email.trim().toLowerCase(),
+      email,
       passwordHash,
       isActive: dto.isActive ?? true,
       role: UserRole.DRIVER,
@@ -89,16 +91,21 @@ export class UsersService {
 
   async updateDriver(driverId: string, dto: AdminUpsertDriverDto) {
     const driver = await this.usersRepository.findOne({
-      where: { id: driverId, role: UserRole.DRIVER },
+      where: {
+        id: driverId,
+        role: UserRole.DRIVER,
+      },
     });
 
     if (!driver) {
       throw new NotFoundException('Repartidor no encontrado');
     }
 
-    if (dto.email.trim().toLowerCase() != driver.email) {
+    const email = dto.email.trim().toLowerCase();
+
+    if (email != driver.email) {
       const existing = await this.usersRepository.findOne({
-        where: { email: dto.email.trim().toLowerCase() },
+        where: { email },
       });
 
       if (existing && existing.id !== driver.id) {
@@ -108,10 +115,10 @@ export class UsersService {
 
     driver.fullName = dto.fullName.trim();
     driver.phone = dto.phone?.trim() ?? null;
-    driver.email = dto.email.trim().toLowerCase();
+    driver.email = email;
     driver.isActive = dto.isActive ?? driver.isActive;
 
-    if (dto.password != null && dto.password.trim().isNotEmpty) {
+    if (dto.password != null && dto.password.trim().length > 0) {
       driver.passwordHash = await bcrypt.hash(dto.password.trim(), 10);
     }
 
