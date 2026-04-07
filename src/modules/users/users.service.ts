@@ -1,10 +1,16 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import * as bcrypt from 'bcryptjs';
 
 import { User } from './entities/user.entity';
 import { UserRole } from '../../common/enums/user-role.enum';
 import { UpdateMeDto } from './dto/update-me.dto';
+import { AdminUpsertDriverDto } from './dto/admin-upsert-driver.dto';
 
 @Injectable()
 export class UsersService {
@@ -50,5 +56,65 @@ export class UsersService {
     }
 
     return this.usersRepository.save(user);
+  }
+
+  async createDriver(dto: AdminUpsertDriverDto) {
+    const existing = await this.usersRepository.findOne({
+      where: { email: dto.email.trim().toLowerCase() },
+    });
+
+    if (existing) {
+      throw new BadRequestException('Ya existe un usuario con ese correo');
+    }
+
+    if (!dto.password || dto.password.trim().length < 4) {
+      throw new BadRequestException(
+        'La contraseña es obligatoria para crear repartidor',
+      );
+    }
+
+    const passwordHash = await bcrypt.hash(dto.password.trim(), 10);
+
+    const driver = this.usersRepository.create({
+      fullName: dto.fullName.trim(),
+      phone: dto.phone?.trim() ?? null,
+      email: dto.email.trim().toLowerCase(),
+      passwordHash,
+      isActive: dto.isActive ?? true,
+      role: UserRole.DRIVER,
+    });
+
+    return this.usersRepository.save(driver);
+  }
+
+  async updateDriver(driverId: string, dto: AdminUpsertDriverDto) {
+    const driver = await this.usersRepository.findOne({
+      where: { id: driverId, role: UserRole.DRIVER },
+    });
+
+    if (!driver) {
+      throw new NotFoundException('Repartidor no encontrado');
+    }
+
+    if (dto.email.trim().toLowerCase() != driver.email) {
+      const existing = await this.usersRepository.findOne({
+        where: { email: dto.email.trim().toLowerCase() },
+      });
+
+      if (existing && existing.id !== driver.id) {
+        throw new BadRequestException('Ya existe un usuario con ese correo');
+      }
+    }
+
+    driver.fullName = dto.fullName.trim();
+    driver.phone = dto.phone?.trim() ?? null;
+    driver.email = dto.email.trim().toLowerCase();
+    driver.isActive = dto.isActive ?? driver.isActive;
+
+    if (dto.password != null && dto.password.trim().isNotEmpty) {
+      driver.passwordHash = await bcrypt.hash(dto.password.trim(), 10);
+    }
+
+    return this.usersRepository.save(driver);
   }
 }
