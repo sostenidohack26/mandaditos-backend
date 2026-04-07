@@ -26,9 +26,6 @@ export class CustomerAddressesController {
     @Body() dto: CreateCustomerAddressDto,
     @Req() req: any,
   ) {
-    console.log('ADDR CREATE req.user =>', req.user);
-    console.log('ADDR CREATE customerId =>', customerId);
-
     if (
       req.user.role !== UserRole.ADMIN &&
       req.user.userId !== customerId
@@ -44,9 +41,6 @@ export class CustomerAddressesController {
     @Param('customerId') customerId: string,
     @Req() req: any,
   ) {
-    console.log('ADDR req.user =>', req.user);
-    console.log('ADDR customerId =>', customerId);
-
     if (
       req.user.role !== UserRole.ADMIN &&
       req.user.userId !== customerId

@@ -39,6 +39,8 @@ export class CustomerAddressesService {
       neighborhood: dto.neighborhood,
       references: dto.references ?? null,
       isPrimary: dto.isPrimary ?? false,
+      latitude: dto.latitude ?? null,
+      longitude: dto.longitude ?? null,
     });
 
     return this.addressesRepository.save(address);
