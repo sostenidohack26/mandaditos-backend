@@ -47,11 +47,11 @@ export class UsersService {
       throw new NotFoundException('Usuario no encontrado');
     }
 
-    if (dto.fullName != null && dto.fullName.trim().isNotEmpty) {
+    if (dto.fullName != null && dto.fullName.trim().length > 0) {
       user.fullName = dto.fullName.trim();
     }
 
-    if (dto.phone != null && dto.phone.trim().isNotEmpty) {
+    if (dto.phone != null && dto.phone.trim().length > 0) {
       user.phone = dto.phone.trim();
     }
 
@@ -103,7 +103,7 @@ export class UsersService {
 
     const email = dto.email.trim().toLowerCase();
 
-    if (email != driver.email) {
+    if (email !== driver.email) {
       const existing = await this.usersRepository.findOne({
         where: { email },
       });
