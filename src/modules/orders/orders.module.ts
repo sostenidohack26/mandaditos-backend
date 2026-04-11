@@ -10,7 +10,12 @@ import { CustomerAddress } from '../customer-addresses/entities/customer-address
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Order, OrderItem, User, CustomerAddress]),
+    TypeOrmModule.forFeature([
+      Order,
+      OrderItem,
+      User,
+      CustomerAddress,
+    ]),
   ],
   controllers: [OrdersController],
   providers: [OrdersService],

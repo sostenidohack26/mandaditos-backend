@@ -1,7 +1,10 @@
 import {
+  Body,
   Controller,
   Get,
   Param,
+  Patch,
+  Post,
   Req,
   UseGuards,
   ForbiddenException,
@@ -9,11 +12,27 @@ import {
 import { OrdersService } from './orders.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { UserRole } from '../../common/enums/user-role.enum';
+import { CreateOrderDto } from './dto/create-order.dto';
 
 @Controller('orders')
 @UseGuards(JwtAuthGuard)
 export class OrdersController {
   constructor(private readonly ordersService: OrdersService) {}
+
+  @Post()
+  createOrder(@Body() dto: CreateOrderDto, @Req() req: any) {
+    if (
+      req.user.role !== UserRole.ADMIN &&
+      !(
+        req.user.role === UserRole.CUSTOMER &&
+        req.user.userId === dto.customerId
+      )
+    ) {
+      throw new ForbiddenException('No autorizado');
+    }
+
+    return this.ordersService.createOrder(dto);
+  }
 
   @Get('live')
   getLiveOrders(@Req() req: any) {
@@ -24,8 +43,39 @@ export class OrdersController {
     return this.ordersService.getLiveOrders();
   }
 
+  @Get('available')
+  getAvailableOrders(@Req() req: any) {
+    if (
+      req.user.role !== UserRole.DRIVER &&
+      req.user.role !== UserRole.ADMIN
+    ) {
+      throw new ForbiddenException('No autorizado');
+    }
+
+    return this.ordersService.getAvailableOrders();
+  }
+
+  @Patch(':orderId/assign')
+  assignOrder(
+    @Param('orderId') orderId: string,
+    @Body() body: { driverId: string },
+    @Req() req: any,
+  ) {
+    if (
+      req.user.role !== UserRole.DRIVER &&
+      req.user.role !== UserRole.ADMIN
+    ) {
+      throw new ForbiddenException('No autorizado');
+    }
+
+    const driverId =
+      req.user.role === UserRole.DRIVER ? req.user.userId : body.driverId;
+
+    return this.ordersService.assignOrder(orderId, driverId);
+  }
+
   @Get('customer/:customerId')
-  getOrdersByCustomer(
+  async getOrdersByCustomer(
     @Param('customerId') customerId: string,
     @Req() req: any,
   ) {
@@ -36,6 +86,15 @@ export class OrdersController {
       throw new ForbiddenException('No autorizado');
     }
 
-    return this.ordersService.getOrdersByCustomer(customerId);
+    try {
+      console.log('CONTROLLER customerId =', customerId);
+      return await this.ordersService.getOrdersByCustomer(customerId);
+    } catch (error) {
+      console.error(
+        'CONTROLLER ERROR /orders/customer/:customerId =>',
+        error,
+      );
+      throw error;
+    }
   }
 }
