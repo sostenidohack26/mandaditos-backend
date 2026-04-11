@@ -121,6 +121,28 @@ export class OrdersService {
     });
   }
 
+  async getOrdersByDriver(driverId: string) {
+    try {
+      console.log('SERVICE driverId =', driverId);
+
+      const result = await this.ordersRepository
+        .createQueryBuilder('order')
+        .leftJoinAndSelect('order.customer', 'customer')
+        .leftJoinAndSelect('order.driver', 'driver')
+        .leftJoinAndSelect('order.address', 'address')
+        .leftJoinAndSelect('order.items', 'items')
+        .where('driver.id = :driverId', { driverId })
+        .orderBy('order.createdAt', 'DESC')
+        .getMany();
+
+      console.log('PEDIDOS DRIVER OK:', result.length);
+      return result;
+    } catch (error) {
+      console.error('SERVICE ERROR getOrdersByDriver =>', error);
+      throw error;
+    }
+  }
+
   async assignOrder(orderId: string, driverId: string) {
     const order = await this.ordersRepository.findOne({
       where: { id: orderId },

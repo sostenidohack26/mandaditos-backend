@@ -55,6 +55,30 @@ export class OrdersController {
     return this.ordersService.getAvailableOrders();
   }
 
+  @Get('driver/:driverId')
+  async getOrdersByDriver(
+    @Param('driverId') driverId: string,
+    @Req() req: any,
+  ) {
+    if (
+      req.user.role !== UserRole.ADMIN &&
+      req.user.userId !== driverId
+    ) {
+      throw new ForbiddenException('No autorizado');
+    }
+
+    try {
+      console.log('CONTROLLER driverId =', driverId);
+      return await this.ordersService.getOrdersByDriver(driverId);
+    } catch (error) {
+      console.error(
+        'CONTROLLER ERROR /orders/driver/:driverId =>',
+        error,
+      );
+      throw error;
+    }
+  }
+
   @Patch(':orderId/assign')
   assignOrder(
     @Param('orderId') orderId: string,
